@@ -78,6 +78,8 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
+    //사용자 입력 값으로 textView생성.
+    //userInputField text 들고 와서 위젯 추가하는 방식.
     protected  void createUserTextView()
     {
         TextView textView = new TextView(this);
@@ -99,6 +101,7 @@ public class MainActivity extends AppCompatActivity {
         layout.addView(textView);
     }
 
+    //AI 응답 받고 Textview 위젯 생성
     protected  void createResponseTextView(String Message)
     {
         TextView textView = new TextView(this);
