@@ -7,50 +7,64 @@
     android:layout_height="match_parent"
     tools:context=".MainActivity">
 
+    <!-- 채팅 스크롤 영역 -->
     <ScrollView
-        android:layout_width="match_parent"
-        android:layout_height="0dp">
+        android:id="@+id/scrollView"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:fillViewport="true"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintBottom_toTopOf="@+id/linearLayout"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent">
 
         <LinearLayout
             android:id="@+id/chatContainer"
             android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:orientation="vertical">
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:padding="16dp">
 
             <TextView
                 android:id="@+id/textView"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:background="#D0CDCD"
-                android:text="오늘의 하루를 알려줘요.감정이나 재밌었던 일 모두 말이죠!" />
+                android:padding="8dp"
+                android:text="오늘의 하루를 알려줘요. 감정이나 재밌었던 일 모두 말이죠!" />
         </LinearLayout>
     </ScrollView>
 
+    <!-- 입력창 및 버튼 -->
     <LinearLayout
         android:id="@+id/linearLayout"
-        android:layout_width="match_parent"
+        android:layout_width="0dp"
         android:layout_height="wrap_content"
-        android:gravity="bottom"
         android:orientation="horizontal"
-        app:layout_constraintBottom_toBottomOf="parent">
+        android:padding="8dp"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent">
 
         <com.google.android.material.textfield.TextInputLayout
-            android:layout_width="342dp"
-            android:layout_height="match_parent">
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1">
 
             <com.google.android.material.textfield.TextInputEditText
                 android:id="@+id/userMessageInputField"
                 android:layout_width="match_parent"
-                android:layout_height="match_parent"
-                android:hint="여기에 입력." />
+                android:layout_height="wrap_content"
+                android:hint="여기에 입력."
+                android:inputType="text" />
         </com.google.android.material.textfield.TextInputLayout>
 
         <Button
             android:id="@+id/sendButton"
-            android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:text="전송" />
-
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="전송"
+            android:layout_marginStart="8dp" />
     </LinearLayout>
 
 </androidx.constraintlayout.widget.ConstraintLayout>
