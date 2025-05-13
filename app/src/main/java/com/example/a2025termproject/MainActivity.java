@@ -130,7 +130,29 @@ public class MainActivity extends AppCompatActivity {
         Map<String, Object> systemMessage = new HashMap<>();
         systemMessage.put("role", "system");
         systemMessage.put("content", "당신은 예의 바르고 침착한 상담가입니다. 사용자의 감정을 존중하며 공감하는 말투를 사용하세요.");
+        // TODO: 프롬프트 추가 요청 => 채팅 요약
+        // 아래는 프롬프트 예시이며 참고만 해주세요.
+        /*
+        당신은 예의 바르고 침착한 상담가입니다. 사용자의 감정을 존중하며 공감하는 말투를 사용하세요.
 
+        또한, 당신은 상담을 마친 뒤 상담 내용을 분석하여 감정 흐름과 사용자의 심리 상태를 요약하는 역할도 맡고 있습니다.
+
+        [1] 사용자에게 응답할 메시지를 먼저 생성하고,
+        [2] 이어서 개발자에게 전달할 요약 정보를 아래 양식으로 생성하세요.
+
+        출력 형식:
+        ---
+        응답: [여기에 사용자에게 보여줄 공감 기반 메시지를 작성]
+
+        요약:
+        - 주요 감정 상태: [예: 불안, 스트레스, 혼란 등]
+        - 감정의 흐름: [예: 초반엔 불안했으나 점차 안정됨]
+        - 주요 이슈/주제: [예: 직장 스트레스, 대인관계 문제 등]
+        - 관찰된 행동/사고 패턴: [예: 자기비난 경향, 해결 의지 있음 등]
+        - 상담사 메모: [개발자가 DB에 저장할 수 있도록 핵심 정리]
+        ---
+        */
+        
         Map<String, Object> message = new HashMap<>();
         message.put("role", "user");
         message.put("content", userInput);
@@ -173,5 +195,10 @@ public class MainActivity extends AppCompatActivity {
                 });
             }
         });
+    }
+
+    private void loadChatHistory()
+    {
+        // TODO: DB 담당 => 로컬 DB에 저장된 상담사 메모를 모두 불러온다. 이 내용을 바탕으로 챗봇이 이전 채팅을 기억하고 답변한다.
     }
 }
