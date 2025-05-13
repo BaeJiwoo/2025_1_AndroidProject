@@ -41,6 +41,9 @@ public class MainActivity extends AppCompatActivity {
     Button Btn_send;
     TextInputEditText userInputField;
 
+    /// 프롬프트 + 모든 메시지(사용자와 챗봇의 대화)
+    List<Map<String, Object>> messages = new ArrayList<>();
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -59,14 +62,20 @@ public class MainActivity extends AppCompatActivity {
             createUserTextView();
         });
 
+        // 시스템 메시지 추가
+        {
+            String history = loadChatHistory(); // 채팅 요약본 모두 불러오기
+            String prompt = buildPrompt();  // 프롬프트 작성
+            ChatMessage system = new ChatMessage("system", history + prompt);
+            messages.add(system.message);
+        }
+
         ViewCompat.setOnApplyWindowInsetsListener(findViewById(R.id.main), (v, insets) -> {
             Insets systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars());
             v.setPadding(systemBars.left, systemBars.top, systemBars.right, systemBars.bottom);
             return insets;
         });
     }
-
-
 
     private String extractContentFromResponse(String json) {
         try {
@@ -128,37 +137,16 @@ public class MainActivity extends AppCompatActivity {
         
         OkHttpClient client = new OkHttpClient();
 
-        // JSON 만들기
-        Map<String, Object> systemMessage = new HashMap<>();
-
-        // 시스템 메시지 ()
-        {
-            systemMessage.put("role", "system");
-
-            String history = loadChatHistory(); // 이전 채팅 요약본 모두 불러오기
-            String prompt = buildPrompt();  // 프롬프트 작성
-
-            // 이전의 채팅 요약본 모두 기억한 뒤에 프롬프트 적용
-            systemMessage.put("content", history + "\n" + prompt);
-        }
-
-        // 사용자 응답
-        Map<String, Object> message = new HashMap<>();
-        message.put("role", "user");
-        message.put("content", userInput);
-
-        // 모든 메시지
-        // 기존에는 사용자 응답만 전달하고 있어서 시스템 응답도 같이 전달 되도록 변경했다.
-        // => "당신은 예의 바르고 침착한 상담가입니다. 사용자의 감정을 존중하며 공감하는 말투를 사용하세요." 라는 프롬프트가 적용되지 않고 챗봇이 답변해주고 있었다.
-        List<Map<String, Object>> messages = new ArrayList<>();
-        messages.add(systemMessage);  // 시스템 메시지 (이전 상담 요약 + 프롬프트)
-        messages.add(message);        // 사용자 응답
+        // 사용자 응답 추가
+        ChatMessage user = new ChatMessage("user", userInput);
+        messages.add(user.message);
 
         Map<String, Object> body = new HashMap<>();
         body.put("model", "gpt-3.5-turbo");
-        // body.put("messages", Collections.singletonList(message));    // 사용자 응답만 전달하고 있다.
         body.put("messages", messages);
-        body.put("max_tokens", 100);    // TODO: 응답과 요약본을 필요해서 토큰이 더 길어야 한다.
+        body.put("max_tokens", 100);
+
+        // JSON 만들기
         Gson gson = new Gson();
         String jsonBody = gson.toJson(body);
 
@@ -189,8 +177,13 @@ public class MainActivity extends AppCompatActivity {
 
                 Log.d("ChatGPT", "응답 성공: " + responseBody);
                 runOnUiThread(() -> {
-                    createResponseTextView(extractContentFromResponse(responseBody));
-                    //saveChatHistory();  // TODO: DB 담당 => 채팅 요약 프롬프트가 정상적으로 작동한다면 호출할 것
+                    String content = extractContentFromResponse(responseBody);
+
+                    // 챗봇 응답 추가
+                    ChatMessage assistant = new ChatMessage("assistant", content);
+                    messages.add(assistant.message);
+
+                    createResponseTextView(content);
                 });
             }
         });
@@ -200,9 +193,8 @@ public class MainActivity extends AppCompatActivity {
     private String buildPrompt()
     {
         return "당신은 예의 바르고 침착한 상담가입니다. 사용자의 감정을 존중하며 공감하는 말투를 사용하세요.\n" +
-                "※ 응답은 50자 이내로 간결하게 말해 주세요.";
-
-        // 사실 테스트를 위해 적용해봤는데, 대답이 너무 인위적이다. 차라리 요약본을 주지 말고 모든 채팅 로그를 주는게 대화가 더 자연스러울 것 같다.
+                "※ 응답은 50자 이내로 간결하게 말해 주세요.\n" +
+                "※ 이전 대화 내용을 기억하고, 그 맥락을 반영하여 자연스럽게 대화를 이어가 주세요.";
 
         // TODO: 프롬프트 추가 요청 => 채팅 요약
         // 아래는 프롬프트 예시이며 참고만 해주세요.
@@ -210,6 +202,7 @@ public class MainActivity extends AppCompatActivity {
         /*
         당신은 예의 바르고 침착한 상담가입니다. 사용자의 감정을 존중하며 공감하는 말투를 사용하세요.
         ※ 응답은 50자 이내로 간결하게 말해 주세요.
+        ※ 이전 대화 내용을 기억하고, 그 맥락을 반영하여 자연스럽게 대화를 이어가 주세요.
 
         또한, 당신은 상담을 마친 뒤 상담 내용을 분석하여 감정 흐름과 사용자의 심리 상태를 요약하는 역할도 맡고 있습니다.
 
@@ -230,7 +223,7 @@ public class MainActivity extends AppCompatActivity {
         */
     }
 
-    /// 이전 채팅 요약본을 모두 불러온다.
+    /// DB에 저장된 채팅 요약본을 모두 불러온다.
     private String loadChatHistory()
     {
         ChatHistoryDatabaseHelper db = new ChatHistoryDatabaseHelper(this);
@@ -244,11 +237,13 @@ public class MainActivity extends AppCompatActivity {
 
         for (String summary : history)
             sb.append("- ").append(summary).append("\n");
+        sb.append("\n");
 
         return sb.toString();
     }
 
     /// DB에 채팅 요약본을 저장한다.
+    /// TODO: 앱을 끄면 채팅 요약본을 DB에 저장할 수 있게 호출한다. 단, 요약 프롬프트가 정상적으로 작동한다는 가정 하에 해야한다.
     private void saveChatHistory(String summary)
     {
         // 비어 있으면 저장 안 한다
