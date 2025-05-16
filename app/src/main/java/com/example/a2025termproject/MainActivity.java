@@ -32,6 +32,7 @@ import okhttp3.*;
 
 
 import org.json.JSONArray;
+import org.json.JSONException;
 import org.json.JSONObject;
 
 public class MainActivity extends AppCompatActivity {
@@ -64,9 +65,11 @@ public class MainActivity extends AppCompatActivity {
 
         // 시스템 메시지 추가
         {
+            // FIXME : uildPrompt함수 파라미터 및 반환 값 존재.
+            // Map<String, Object> buildPrompt(String userInput, Boolean summaryMode)
             String history = loadChatHistory(); // 채팅 요약본 모두 불러오기
-            String prompt = buildPrompt();  // 프롬프트 작성
-            ChatMessage system = new ChatMessage("system", history + prompt);
+            //String prompt = buildPrompt();  // 프롬프트 작성
+            ChatMessage system = new ChatMessage("system", history /*+ prompt*/);
             messages.add(system.message);
         }
 
@@ -137,14 +140,8 @@ public class MainActivity extends AppCompatActivity {
         
         OkHttpClient client = new OkHttpClient();
 
-        // 사용자 응답 추가
-        ChatMessage user = new ChatMessage("user", userInput);
-        messages.add(user.message);
 
-        Map<String, Object> body = new HashMap<>();
-        body.put("model", "gpt-3.5-turbo");
-        body.put("messages", messages);
-        body.put("max_tokens", 100);
+        Map<String, Object> body = buildPrompt(userInput, false);
 
         // JSON 만들기
         Gson gson = new Gson();
@@ -183,21 +180,28 @@ public class MainActivity extends AppCompatActivity {
                     ChatMessage assistant = new ChatMessage("assistant", content);
                     messages.add(assistant.message);
 
-                    createResponseTextView(content);
+                    Log.d("GPT_RAW", content);
+
+                    // json 형태로 gpt 응답
+                    try {
+                        JSONObject gptResponse = new JSONObject(content);
+                        String gptResopnse = gptResponse.getString("response");
+                        String summary = gptResponse.getString("summary");
+                        createResponseTextView(gptResopnse);
+                        saveChatHistory(summary); // 요약삽입
+                    } catch (JSONException e) {
+                        Log.e("JSON_PARSE_ERROR", "JSON 파싱 오류: " + e.getMessage());
+                        createResponseTextView("⚠️ 응답을 JSON으로 파싱할 수 없습니다.\n" + content);
+                    }
                 });
             }
         });
     }
 
     /// 챗봇 프롬프트를 작성한다.
-    private String buildPrompt()
-    {
-        return "당신은 예의 바르고 침착한 상담가입니다. 사용자의 감정을 존중하며 공감하는 말투를 사용하세요.\n" +
-                "※ 응답은 50자 이내로 간결하게 말해 주세요.\n" +
-                "※ 이전 대화 내용을 기억하고, 그 맥락을 반영하여 자연스럽게 대화를 이어가 주세요.";
+    private Map<String, Object> buildPrompt(String userInput, Boolean summaryMode)
 
-        // TODO: 프롬프트 추가 요청 => 채팅 요약
-        // 아래는 프롬프트 예시이며 참고만 해주세요.
+    {
 
         /*
         당신은 예의 바르고 침착한 상담가입니다. 사용자의 감정을 존중하며 공감하는 말투를 사용하세요.
@@ -221,6 +225,28 @@ public class MainActivity extends AppCompatActivity {
         - 상담사 메모: [개발자가 DB에 저장할 수 있도록 핵심 정리]
         ---
         */
+
+        Map<String, Object> body = new HashMap<>();
+        body.put("model", "gpt-3.5-turbo");
+        body.put("max_tokens", 700);
+
+        if(!summaryMode)
+        {
+            ChatMessage system = new ChatMessage("system", "Response on users language. You are an excellent counselor. Response to following text and Respond in **strict JSON format only** without any explanation or prefix. Use this exact format:\\n\\n{\\\"response\\\": \\\"Full Response\\\", \\\"summary\\\": \\\"summary of response\\\"}");
+            messages.add(system.message);// 사용자 응답 추가
+            ChatMessage user = new ChatMessage("user", userInput);
+            messages.add(user.message);
+            body.put("messages", messages);
+        }
+        else
+        {
+            ChatMessage system = new ChatMessage("system", "Please Summarize the following texts.");
+            messages.add(system.message);// 사용자 응답 추가
+            ChatMessage user = new ChatMessage("user", userInput);
+            messages.add(user.message);
+            body.put("messages", messages);
+        }
+        return body;
     }
 
     /// DB에 저장된 채팅 요약본을 모두 불러온다.
@@ -249,8 +275,8 @@ public class MainActivity extends AppCompatActivity {
         // 비어 있으면 저장 안 한다
         if (summary.isEmpty())
             return;
-
         ChatHistoryDatabaseHelper db = new ChatHistoryDatabaseHelper(this);
+        Log.d("GPT_RAW", JSONObject.quote(summary));
         db.insert(summary);
     }
 }
