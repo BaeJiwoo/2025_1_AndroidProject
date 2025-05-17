@@ -22,7 +22,6 @@ import android.util.Log;
 import com.google.gson.Gson;
 
 import java.io.IOException;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.ArrayList;
@@ -45,6 +44,7 @@ public class MainActivity extends AppCompatActivity {
     /// 프롬프트 + 모든 메시지(사용자와 챗봇의 대화)
     List<Map<String, Object>> messages = new ArrayList<>();
 
+    /// 초기화 작업
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -57,19 +57,17 @@ public class MainActivity extends AppCompatActivity {
         Btn_send = findViewById(R.id.sendButton);
         userInputField = findViewById(R.id.userMessageInputField);
 
-
         Btn_send.setOnClickListener(v -> {
             Toast.makeText(this, "답장을 기다려줘요.", Toast.LENGTH_SHORT).show();
             createUserTextView();
         });
 
-        // 시스템 메시지 추가
+        // 시스템 메시지 추가 (상담사 프롬프트 작성 + 요약본 모두 불러오기)
         {
-            // FIXME : uildPrompt함수 파라미터 및 반환 값 존재.
-            // Map<String, Object> buildPrompt(String userInput, Boolean summaryMode)
             String history = loadChatHistory(); // 채팅 요약본 모두 불러오기
-            //String prompt = buildPrompt();  // 프롬프트 작성
-            ChatMessage system = new ChatMessage("system", history /*+ prompt*/);
+            String prompt = buildPrompt();  // 프롬프트 작성
+
+            ChatMessage system = new ChatMessage("system", history + prompt);
             messages.add(system.message);
         }
 
@@ -78,6 +76,83 @@ public class MainActivity extends AppCompatActivity {
             v.setPadding(systemBars.left, systemBars.top, systemBars.right, systemBars.bottom);
             return insets;
         });
+    }
+
+    /// 다른 화면으로 전환될 때 호출되는 함수이다.
+    @Override
+    protected void onStop()
+    {
+        super.onStop();
+        Log.d("callBack", "onStop");
+
+        OkHttpClient client = new OkHttpClient();
+
+        // 시스템 메시지 추가 (요약 프롬프트)
+        String prompt = buildSummaryPrompt();
+        Map<String, Object> body = buildBody(prompt, true);
+
+        // JSON 만들기
+        Gson gson = new Gson();
+        String jsonBody = gson.toJson(body);
+
+        // Request 만들기
+        Request request = new Request.Builder()
+                .url(API_URL)
+                .post(RequestBody.create(jsonBody, MediaType.get("application/json")))
+                .addHeader("Authorization", apiKey)
+                .addHeader("Content-Type", "application/json")
+                .build();
+
+        // 비동기 요청
+        client.newCall(request).enqueue(new Callback() {
+            @Override
+            public void onFailure(Call call, IOException e) {
+                Log.e("ChatGPT", "요청 실패: " + e.getMessage());
+            }
+
+            @Override
+            public void onResponse(Call call, Response response) throws IOException {
+                String responseBody = response.body() != null ? response.body().string() : "";
+
+                if (!response.isSuccessful()) {
+                    Log.e("ChatGPT", "응답 실패 - 상태 코드: " + response.code());
+                    Log.e("ChatGPT", "에러 메시지 본문: " + responseBody); // 📌 여기서( 에러 메시지 출력
+                    return;
+                }
+
+                Log.d("ChatGPT", "응답 성공: " + responseBody);
+                runOnUiThread(() -> {
+                    String content = extractContentFromResponse(responseBody);
+                    Log.d("GPT_RAW", content);
+
+                    // json 형태로 gpt 응답
+                    try {
+                        JSONObject gptResponse = new JSONObject(content);
+                        String summary = gptResponse.getString("summary");
+                        saveChatHistory(summary);   // 요약 삽입
+                    }
+                    catch (JSONException e) {
+                        Log.e("JSON_PARSE_ERROR", "JSON 파싱 오류: " + e.getMessage());
+                    }
+                });
+            }
+        });
+    }
+
+    @Override
+    protected void onRestart()
+    {
+        super.onRestart();
+        Log.d("callBack", "onRestart");
+
+        // 시스템 메시지 추가 (상담사 프롬프트 작성 + 요약본 모두 불러오기)
+        {
+            String history = loadChatHistory(); // 채팅 요약본 모두 불러오기
+            String prompt = buildPrompt();  // 프롬프트 작성
+
+            ChatMessage system = new ChatMessage("system", history + prompt);
+            messages.add(system.message);
+        }
     }
 
     private String extractContentFromResponse(String json) {
@@ -115,7 +190,7 @@ public class MainActivity extends AppCompatActivity {
     }
 
     //AI 응답 받고 Textview 위젯 생성
-    protected  void createResponseTextView(String Message)
+    protected void createResponseTextView(String Message)
     {
         TextView textView = new TextView(this);
         textView.setText(Message.toString());
@@ -137,11 +212,8 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void sendChatMessage(String userInput) {
-        
         OkHttpClient client = new OkHttpClient();
-
-
-        Map<String, Object> body = buildPrompt(userInput, false);
+        Map<String, Object> body = buildBody(userInput);
 
         // JSON 만들기
         Gson gson = new Gson();
@@ -175,22 +247,25 @@ public class MainActivity extends AppCompatActivity {
                 Log.d("ChatGPT", "응답 성공: " + responseBody);
                 runOnUiThread(() -> {
                     String content = extractContentFromResponse(responseBody);
-
-                    // 챗봇 응답 추가
-                    ChatMessage assistant = new ChatMessage("assistant", content);
-                    messages.add(assistant.message);
-
                     Log.d("GPT_RAW", content);
 
                     // json 형태로 gpt 응답
                     try {
                         JSONObject gptResponse = new JSONObject(content);
-                        String gptResopnse = gptResponse.getString("response");
-                        String summary = gptResponse.getString("summary");
-                        createResponseTextView(gptResopnse);
-                        saveChatHistory(summary); // 요약삽입
-                    } catch (JSONException e) {
+                        String r = gptResponse.getString("response");
+
+                        // 챗봇 응답 추가
+                        ChatMessage assistant = new ChatMessage("assistant", r);
+                        messages.add(assistant.message);
+
+                        createResponseTextView(r);
+                    }
+                    catch (JSONException e) {
                         Log.e("JSON_PARSE_ERROR", "JSON 파싱 오류: " + e.getMessage());
+
+                        ChatMessage assistant = new ChatMessage("assistant", content);
+                        messages.add(assistant.message);
+
                         createResponseTextView("⚠️ 응답을 JSON으로 파싱할 수 없습니다.\n" + content);
                     }
                 });
@@ -199,53 +274,51 @@ public class MainActivity extends AppCompatActivity {
     }
 
     /// 챗봇 프롬프트를 작성한다.
-    private Map<String, Object> buildPrompt(String userInput, Boolean summaryMode)
-
+    private String buildPrompt()
     {
+        return "You are a kind and professional counselor. Always reply in the user's language.\n" +
+                "Response to following text and Respond in **strict JSON format only** without any explanation or prefix.\n" +
+                "Use this exact format:" +
+                "\n\n{\"response\": \"Full Response\"}";
+    }
 
-        /*
-        당신은 예의 바르고 침착한 상담가입니다. 사용자의 감정을 존중하며 공감하는 말투를 사용하세요.
-        ※ 응답은 50자 이내로 간결하게 말해 주세요.
-        ※ 이전 대화 내용을 기억하고, 그 맥락을 반영하여 자연스럽게 대화를 이어가 주세요.
+    /// 요약 프롬프트를 작성한다.
+    private String buildSummaryPrompt()
+    {
+        return "You are a summarizing assistant. " +
+                "Based on the following conversation history, generate a concise summary in JSON format only. " +
+                "Use this format:\n\n{\"summary\": \"요약 내용\"}";
+    }
 
-        또한, 당신은 상담을 마친 뒤 상담 내용을 분석하여 감정 흐름과 사용자의 심리 상태를 요약하는 역할도 맡고 있습니다.
+    /// API를 요청하고 body를 생성한다.
+    private Map<String, Object> buildBody(String userInput)
+    {
+        return buildBody(userInput, false);
+    }
 
-        [1] 사용자에게 응답할 메시지를 먼저 생성하고,
-        [2] 이어서 개발자에게 전달할 요약 정보를 아래 양식으로 생성하세요.
-
-        출력 형식:
-        ---
-        응답: [여기에 사용자에게 보여줄 공감 기반 메시지를 작성]
-
-        요약:
-        - 주요 감정 상태: [예: 불안, 스트레스, 혼란 등]
-        - 감정의 흐름: [예: 초반엔 불안했으나 점차 안정됨]
-        - 주요 이슈/주제: [예: 직장 스트레스, 대인관계 문제 등]
-        - 관찰된 행동/사고 패턴: [예: 자기비난 경향, 해결 의지 있음 등]
-        - 상담사 메모: [개발자가 DB에 저장할 수 있도록 핵심 정리]
-        ---
-        */
-
+    /// API를 요청하고 body를 생성한다.
+    private Map<String, Object> buildBody(String input, boolean systemMode)
+    {
         Map<String, Object> body = new HashMap<>();
+
+        // API 요청
         body.put("model", "gpt-3.5-turbo");
         body.put("max_tokens", 700);
 
-        if(!summaryMode)
+        if (systemMode)
         {
-            ChatMessage system = new ChatMessage("system", "Response on users language. You are an excellent counselor. Response to following text and Respond in **strict JSON format only** without any explanation or prefix. Use this exact format:\\n\\n{\\\"response\\\": \\\"Full Response\\\", \\\"summary\\\": \\\"summary of response\\\"}");
-            messages.add(system.message);// 사용자 응답 추가
-            ChatMessage user = new ChatMessage("user", userInput);
-            messages.add(user.message);
-            body.put("messages", messages);
+            // 시스템 메시지 추가
+            ChatMessage system = new ChatMessage("system", input);
+            messages.add(system.message);
         }
         else
         {
-            ChatMessage system = new ChatMessage("system", "Please Summarize the following texts.");
-            messages.add(system.message);// 사용자 응답 추가
-            ChatMessage user = new ChatMessage("user", userInput);
+            // 사용자 응답 추가
+            ChatMessage user = new ChatMessage("user", input);
             messages.add(user.message);
-            body.put("messages", messages);
         }
+
+        body.put("messages", messages);
         return body;
     }
 
