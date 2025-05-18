@@ -29,7 +29,7 @@
                 android:id="@+id/textView"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:background="#D0CDCD"
+                android:background="@drawable/chat_box"
                 android:padding="8dp"
                 android:text="오늘의 하루를 알려줘요. 감정이나 재밌었던 일 모두 말이죠!" />
         </LinearLayout>
@@ -47,24 +47,33 @@
         app:layout_constraintEnd_toEndOf="parent">
 
         <com.google.android.material.textfield.TextInputLayout
-            android:layout_width="0dp"
+            android:layout_width="297dp"
             android:layout_height="wrap_content"
+            android:orientation="vertical"
             android:layout_weight="1">
 
             <com.google.android.material.textfield.TextInputEditText
                 android:id="@+id/userMessageInputField"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:hint="여기에 입력."
-                android:inputType="text" />
+                android:layout_width="297dp"
+                android:layout_height="52dp"
+                android:orientation="horizontal"
+                android:hint="여기에 입력"
+                android:inputType="text"/>
         </com.google.android.material.textfield.TextInputLayout>
 
-        <Button
+        <com.google.android.material.button.MaterialButton
             android:id="@+id/sendButton"
             android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
+            android:layout_height="61dp"
+            android:layout_gravity="center"
+            android:layout_weight="0"
+            android:backgroundTint="#673AB7"
             android:text="전송"
-            android:layout_marginStart="8dp" />
+            android:textColor="@android:color/white"
+            android:textSize="20dp"
+            app:cornerRadius="15dp"
+            app:strokeColor="@color/white"
+            app:strokeWidth="0dp" />
     </LinearLayout>
 
 </androidx.constraintlayout.widget.ConstraintLayout>

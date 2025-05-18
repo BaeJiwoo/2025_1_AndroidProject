@@ -169,13 +169,12 @@ public class MainActivity extends AppCompatActivity {
     //사용자 입력 값으로 textView생성.
     //userInputField text 들고 와서 위젯 추가하는 방식.
     protected void createUserTextView() {
-        Btn_send.setEnabled(false);
         TextView textView = new TextView(this);
         textView.setText(userInputField.getText().toString());
-        textView.setTextSize(14);
+        textView.setTextSize(16);
         textView.setBackgroundColor(Color.parseColor("#b6bffe"));
-        textView.setGravity(Gravity.RIGHT);
-
+        textView.setBackgroundResource(R.drawable.chat_box_green);
+        textView.setGravity(Gravity.CENTER_VERTICAL | Gravity.RIGHT);
         textView.setAutoLinkMask(0);
         textView.setPaintFlags(textView.getPaintFlags() & ~Paint.UNDERLINE_TEXT_FLAG);
         textView.setLayoutParams(new LinearLayout.LayoutParams(
@@ -186,6 +185,16 @@ public class MainActivity extends AppCompatActivity {
         sendChatMessage(userInputField.getText().toString());
         userInputField.setText("");
         LinearLayout layout = findViewById(R.id.chatContainer);
+
+        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+        );
+        params.gravity = Gravity.END;
+        params.setMargins(0, 25, 0, 25);
+
+        // 파라미터 적용
+        textView.setLayoutParams(params);
         layout.addView(textView);
     }
 
@@ -193,22 +202,31 @@ public class MainActivity extends AppCompatActivity {
     protected void createResponseTextView(String Message) {
         TextView textView = new TextView(this);
         textView.setText(Message.toString());
-        textView.setTextSize(14);
+        textView.setTextSize(16);
         textView.setBackgroundColor(Color.parseColor("#D0CDCD"));
-        textView.setGravity(Gravity.LEFT);
-
+        textView.setBackgroundResource(R.drawable.chat_box_gray);
+        textView.setGravity(Gravity.CENTER_VERTICAL|Gravity.LEFT);
         textView.setAutoLinkMask(0);
         textView.setPaintFlags(textView.getPaintFlags() & ~Paint.UNDERLINE_TEXT_FLAG);
         textView.setLayoutParams(new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT
         ));
-        //Btn_send.postDelayed(() -> Btn_send.setEnabled(true), 3000);
+        Btn_send.postDelayed(() -> Btn_send.setEnabled(true), 3000);
 
         userInputField.setText("");
         LinearLayout layout = findViewById(R.id.chatContainer);
+
+
+        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+        );
+        params.setMargins(0, 25, 0, 25);
+
+        // 파라미터 적용
+        textView.setLayoutParams(params);
         layout.addView(textView);
-        Btn_send.setEnabled(true);
     }
 
     private void sendChatMessage(String userInput) {
