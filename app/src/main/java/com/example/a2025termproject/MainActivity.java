@@ -8,6 +8,7 @@ import android.widget.Button;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
+import android.widget.RemoteViews;
 
 import androidx.activity.EdgeToEdge;
 import androidx.appcompat.app.AppCompatActivity;
@@ -80,8 +81,7 @@ public class MainActivity extends AppCompatActivity {
 
     /// 다른 화면으로 전환될 때 호출되는 함수이다.
     @Override
-    protected void onStop()
-    {
+    protected void onStop() {
         super.onStop();
         Log.d("callBack", "onStop");
 
@@ -112,6 +112,7 @@ public class MainActivity extends AppCompatActivity {
 
             @Override
             public void onResponse(Call call, Response response) throws IOException {
+                runOnUiThread(() -> Btn_send.setEnabled(false));
                 String responseBody = response.body() != null ? response.body().string() : "";
 
                 if (!response.isSuccessful()) {
@@ -130,18 +131,17 @@ public class MainActivity extends AppCompatActivity {
                         JSONObject gptResponse = new JSONObject(content);
                         String summary = gptResponse.getString("summary");
                         saveChatHistory(summary);   // 요약 삽입
-                    }
-                    catch (JSONException e) {
+                    } catch (JSONException e) {
                         Log.e("JSON_PARSE_ERROR", "JSON 파싱 오류: " + e.getMessage());
                     }
+                    runOnUiThread(() -> Btn_send.setEnabled(true));
                 });
             }
         });
     }
 
     @Override
-    protected void onRestart()
-    {
+    protected void onRestart() {
         super.onRestart();
         Log.d("callBack", "onRestart");
 
@@ -168,8 +168,8 @@ public class MainActivity extends AppCompatActivity {
 
     //사용자 입력 값으로 textView생성.
     //userInputField text 들고 와서 위젯 추가하는 방식.
-    protected  void createUserTextView()
-    {
+    protected void createUserTextView() {
+        Btn_send.setEnabled(false);
         TextView textView = new TextView(this);
         textView.setText(userInputField.getText().toString());
         textView.setTextSize(14);
@@ -190,8 +190,7 @@ public class MainActivity extends AppCompatActivity {
     }
 
     //AI 응답 받고 Textview 위젯 생성
-    protected void createResponseTextView(String Message)
-    {
+    protected void createResponseTextView(String Message) {
         TextView textView = new TextView(this);
         textView.setText(Message.toString());
         textView.setTextSize(14);
@@ -204,11 +203,12 @@ public class MainActivity extends AppCompatActivity {
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT
         ));
-        Btn_send.postDelayed(() -> Btn_send.setEnabled(true), 3000);
+        //Btn_send.postDelayed(() -> Btn_send.setEnabled(true), 3000);
 
         userInputField.setText("");
         LinearLayout layout = findViewById(R.id.chatContainer);
         layout.addView(textView);
+        Btn_send.setEnabled(true);
     }
 
     private void sendChatMessage(String userInput) {
@@ -236,6 +236,7 @@ public class MainActivity extends AppCompatActivity {
 
             @Override
             public void onResponse(Call call, Response response) throws IOException {
+
                 String responseBody = response.body() != null ? response.body().string() : "";
 
                 if (!response.isSuccessful()) {
@@ -259,8 +260,7 @@ public class MainActivity extends AppCompatActivity {
                         messages.add(assistant.message);
 
                         createResponseTextView(r);
-                    }
-                    catch (JSONException e) {
+                    } catch (JSONException e) {
                         Log.e("JSON_PARSE_ERROR", "JSON 파싱 오류: " + e.getMessage());
 
                         ChatMessage assistant = new ChatMessage("assistant", content);
@@ -274,45 +274,39 @@ public class MainActivity extends AppCompatActivity {
     }
 
     /// 챗봇 프롬프트를 작성한다.
-    private String buildPrompt()
-    {
+    private String buildPrompt() {
         return "You are a kind and professional counselor. Always reply in the user's language.\n" +
+                "Your reply must have to under the 100letters" +
                 "Response to following text and Respond in **strict JSON format only** without any explanation or prefix.\n" +
                 "Use this exact format:" +
                 "\n\n{\"response\": \"Full Response\"}";
     }
 
     /// 요약 프롬프트를 작성한다.
-    private String buildSummaryPrompt()
-    {
+    private String buildSummaryPrompt() {
         return "You are a summarizing assistant. " +
                 "Based on the following conversation history, generate a concise summary in JSON format only. " +
                 "Use this format:\n\n{\"summary\": \"요약 내용\"}";
     }
 
     /// API를 요청하고 body를 생성한다.
-    private Map<String, Object> buildBody(String userInput)
-    {
+    private Map<String, Object> buildBody(String userInput) {
         return buildBody(userInput, false);
     }
 
     /// API를 요청하고 body를 생성한다.
-    private Map<String, Object> buildBody(String input, boolean systemMode)
-    {
+    private Map<String, Object> buildBody(String input, boolean systemMode) {
         Map<String, Object> body = new HashMap<>();
 
         // API 요청
         body.put("model", "gpt-3.5-turbo");
         body.put("max_tokens", 700);
 
-        if (systemMode)
-        {
+        if (systemMode) {
             // 시스템 메시지 추가
             ChatMessage system = new ChatMessage("system", input);
             messages.add(system.message);
-        }
-        else
-        {
+        } else {
             // 사용자 응답 추가
             ChatMessage user = new ChatMessage("user", input);
             messages.add(user.message);
@@ -323,8 +317,7 @@ public class MainActivity extends AppCompatActivity {
     }
 
     /// DB에 저장된 채팅 요약본을 모두 불러온다.
-    private String loadChatHistory()
-    {
+    private String loadChatHistory() {
         ChatHistoryDatabaseHelper db = new ChatHistoryDatabaseHelper(this);
         List<String> history = db.getAllSummaries();
 
@@ -343,8 +336,7 @@ public class MainActivity extends AppCompatActivity {
 
     /// DB에 채팅 요약본을 저장한다.
     /// TODO: 앱을 끄면 채팅 요약본을 DB에 저장할 수 있게 호출한다. 단, 요약 프롬프트가 정상적으로 작동한다는 가정 하에 해야한다.
-    private void saveChatHistory(String summary)
-    {
+    private void saveChatHistory(String summary) {
         // 비어 있으면 저장 안 한다
         if (summary.isEmpty())
             return;
