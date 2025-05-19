@@ -284,7 +284,8 @@ public class MainActivity extends AppCompatActivity {
                         ChatMessage assistant = new ChatMessage("assistant", content);
                         messages.add(assistant.message);
 
-                        createResponseTextView("⚠️ 응답을 JSON으로 파싱할 수 없습니다.\n" + content);
+                        // 사용자한테는 JSON 파싱 오류를 보여주지 않는다
+                        createResponseTextView(content);
                     }
                 });
             }
