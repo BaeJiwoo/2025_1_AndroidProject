@@ -8,7 +8,6 @@ import android.widget.Button;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
-import android.widget.RemoteViews;
 
 import androidx.activity.EdgeToEdge;
 import androidx.appcompat.app.AppCompatActivity;
@@ -85,7 +84,9 @@ public class MainActivity extends AppCompatActivity {
         super.onStop();
         Log.d("callBack", "onStop");
 
-        OkHttpClient client = new OkHttpClient();
+        // 대화를 시작하지 않았다면 저장 안한다
+        if (messages.size() <= 1)
+            return;
 
         // 시스템 메시지 추가 (요약 프롬프트)
         String prompt = buildSummaryPrompt();
@@ -103,47 +104,51 @@ public class MainActivity extends AppCompatActivity {
                 .addHeader("Content-Type", "application/json")
                 .build();
 
-        // 비동기 요청
-        client.newCall(request).enqueue(new Callback() {
-            @Override
-            public void onFailure(Call call, IOException e) {
-                Log.e("ChatGPT", "요청 실패: " + e.getMessage());
+        OkHttpClient client = new OkHttpClient();
+        String content = null;
+
+        try (Response response = client.newCall(request).execute()) {
+            String responseBody = response.body() != null ? response.body().string() : "";
+
+            if (!response.isSuccessful())
+            {
+                Log.e("ChatGPT", "응답 실패 - 상태 코드: " + response.code());
+                Log.e("ChatGPT", "에러 메시지 본문: " + responseBody); // 📌 여기서( 에러 메시지 출력
+                return;
             }
 
-            @Override
-            public void onResponse(Call call, Response response) throws IOException {
-                runOnUiThread(() -> Btn_send.setEnabled(false));
-                String responseBody = response.body() != null ? response.body().string() : "";
+            Log.d("ChatGPT", "응답 성공: " + responseBody);
 
-                if (!response.isSuccessful()) {
-                    Log.e("ChatGPT", "응답 실패 - 상태 코드: " + response.code());
-                    Log.e("ChatGPT", "에러 메시지 본문: " + responseBody); // 📌 여기서( 에러 메시지 출력
-                    return;
-                }
+            content = extractContentFromResponse(responseBody);
+            Log.d("GPT_RAW", content);
 
-                Log.d("ChatGPT", "응답 성공: " + responseBody);
-                runOnUiThread(() -> {
-                    String content = extractContentFromResponse(responseBody);
-                    Log.d("GPT_RAW", content);
-
-                    // json 형태로 gpt 응답
-                    try {
-                        JSONObject gptResponse = new JSONObject(content);
-                        String summary = gptResponse.getString("summary");
-                        saveChatHistory(summary);   // 요약 삽입
-                    } catch (JSONException e) {
-                        Log.e("JSON_PARSE_ERROR", "JSON 파싱 오류: " + e.getMessage());
-                    }
-                    runOnUiThread(() -> Btn_send.setEnabled(true));
-                });
+            try {
+                JSONObject gptResponse = new JSONObject(content);
+                String summary = gptResponse.getString("summary");
+                saveChatHistory(summary);   // 요약 삽입
             }
-        });
+            catch (JSONException je) {
+                Log.e("JSON_PARSE_ERROR", "JSON 파싱 오류: " + je.getMessage());
+                if (content != null)
+                    saveChatHistory(content);  // 구조는 맞지 않아도 임시 저장
+            }
+        }
+        catch (Exception e) {
+            Log.e("JSON_PARSE_ERROR", "JSON 파싱 오류: " + e.getMessage());
+        }
     }
 
     @Override
     protected void onRestart() {
         super.onRestart();
         Log.d("callBack", "onRestart");
+
+        // 대화를 시작하지 않았다면 프롬프트 재설정할 필요가 없다
+        if (messages.size() <= 1)
+            return;
+
+        // 초기화
+        messages.clear();
 
         // 시스템 메시지 추가 (상담사 프롬프트 작성 + 요약본 모두 불러오기)
         {
@@ -162,7 +167,7 @@ public class MainActivity extends AppCompatActivity {
             JSONObject message = choices.getJSONObject(0).getJSONObject("message");
             return message.getString("content");
         } catch (Exception e) {
-            return "[content 파싱 오류]";
+            return null;
         }
     }
 
